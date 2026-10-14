@@ -122,7 +122,7 @@ internal object PackingJson {
         require(cats.length() <= 500 && entries.length() <= 10000)
         val categories = (0 until cats.length()).map { i ->
             val c = cats.getJSONObject(i)
-            PackingCategory(c.getString("id"), c.names())
+            PackingCategory(c.getString("id"), c.readNames())
         }.toMutableList()
         require(categories.all { it.id.isNotBlank() && it.names.isNotBlank() })
         require(categories.map { it.id }.distinct().size == categories.size)
@@ -130,7 +130,7 @@ internal object PackingJson {
         val ids = categories.map { it.id }.toSet()
         val items = (0 until entries.length()).map { i ->
             val e = entries.getJSONObject(i)
-            Entry(e.getString("id"), e.names(), e.optString("category").takeIf { it in ids } ?: "OTHER",
+            Entry(e.getString("id"), e.readNames(), e.optString("category").takeIf { it in ids } ?: "OTHER",
                 e.optBoolean("packed"), e.optString("note"))
         }
         require(items.all { it.id.isNotBlank() && it.names.isNotBlank() })
@@ -140,7 +140,7 @@ internal object PackingJson {
             ThemeMode.entries.find { it.name == obj.optString("theme") } ?: ThemeMode.SYSTEM)
     }
     private fun JSONObject.putNames(n: Names) { put("hi", n.hi); put("en", n.en); put("sa", n.sa) }
-    private fun JSONObject.names() = Names(optString("hi"), optString("en"), optString("sa")).trimmed()
+    private fun JSONObject.readNames() = Names(optString("hi"), optString("en"), optString("sa")).trimmed()
 }
 
 internal class Store(context: Context) {
