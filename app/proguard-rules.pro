@@ -1,0 +1,1 @@
+# No additional ProGuard rules required for the debug build.
