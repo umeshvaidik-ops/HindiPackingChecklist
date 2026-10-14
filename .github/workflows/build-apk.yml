@@ -31,7 +31,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build APK, run persistence tests, and check Android lint
+      - name: Build APK, run data and UI tests, and check Android lint
         run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
       - name: Prepare downloads
         run: |
@@ -53,6 +53,8 @@ jobs:
           name: Android-verification-reports
           path: |
             app/build/reports/tests/
+            app/build/test-results/
+            app/build/reports/ui/
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
 
@@ -73,10 +75,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
-          PREVIEW_TAG: v1.0.0-preview.${{ github.run_number }}
+          PREVIEW_TAG: v1.1.0-preview.${{ github.run_number }}
         run: |
           gh release create "$PREVIEW_TAG" dist/* \
             --target "$COMMIT_SHA" \
-            --title "Hindi Packing Checklist 1.0.0 — verified preview" \
+            --title "Packing Checklist 1.1.0 — verified preview" \
             --prerelease \
-            --notes "Install HindiPackingChecklist-debug.apk on Android 7.0 or newer. This APK uses a debug signing key and is for personal testing. The complete Android Studio project includes the Gradle wrapper. APK build, persistence tests, and Android lint passed in this workflow. Physical-device UI testing and production release signing are separate steps."
+            --notes "Install HindiPackingChecklist-debug.apk on Android 7.0 or newer. This APK uses a debug signing key and is for personal testing. The complete Android Studio project includes the Gradle wrapper. Includes custom categories, per-item notes, Hindi-English-Sanskrit UI, day/night/device themes, item editing, undo deletion, backup/restore, and a new adaptive launcher icon. APK build, data migration tests, Compose UI tests, and Android lint passed. This preview may use a different debug signing key from an earlier preview; export or record the old checklist before uninstalling an earlier build. Physical-device testing and production release signing are separate steps."
