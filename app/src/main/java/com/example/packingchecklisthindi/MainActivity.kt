@@ -3,6 +3,7 @@ package com.example.packingchecklisthindi
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,12 +22,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-private enum class Category(val label: String) {
+internal enum class Category(val label: String) {
     DOCUMENTS("दस्तावेज़"), CLOTHES("कपड़े"), TOILETRIES("प्रसाधन सामग्री"),
     ELECTRONICS("इलेक्ट्रॉनिक्स"), MEDICINES("दवाइयाँ"), OTHER("अन्य")
 }
-private data class Entry(val id: String, val hi: String, val en: String, val category: Category, val packed: Boolean = false)
-private fun defaults(): List<Entry> {
+internal data class Entry(val id: String, val hi: String, val en: String, val category: Category, val packed: Boolean = false)
+internal fun defaults(): List<Entry> {
     val specs = listOf(
         Triple(Category.DOCUMENTS, "आधार कार्ड", "Aadhaar card"),
         Triple(Category.DOCUMENTS, "टिकट", "Tickets"),
@@ -57,17 +59,19 @@ private fun defaults(): List<Entry> {
     )
     return specs.mapIndexed { index, t -> Entry("default-$index", t.second, t.third, t.first) }
 }
-private class Store(context: Context) {
+internal class Store(context: Context) {
     private val pref = context.getSharedPreferences("packing_hindi", Context.MODE_PRIVATE)
-    fun load(): List<Entry> = try {
+    fun load(): List<Entry> {
         val raw = pref.getString("items", null) ?: return defaults()
-        val arr = JSONArray(raw)
-        (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
-            Entry(o.getString("id"), o.getString("hi"), o.optString("en"),
-                Category.valueOf(o.getString("category")), o.optBoolean("packed"))
-        }
-    } catch (_: Exception) { defaults() }
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Entry(o.getString("id"), o.getString("hi"), o.optString("en"),
+                    Category.valueOf(o.getString("category")), o.optBoolean("packed"))
+            }
+        } catch (_: Exception) { defaults() }
+    }
     fun save(list: List<Entry>) {
         val arr = JSONArray()
         list.forEach { e ->
@@ -82,6 +86,7 @@ private class Store(context: Context) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         val store = Store(applicationContext)
         setContent { MaterialTheme(colorScheme = lightColorScheme()) { App(store) } }
     }
@@ -90,10 +95,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun App(store: Store) {
     val entries = remember { mutableStateListOf<Entry>().apply { addAll(store.load()) } }
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableIntStateOf(0) }
-    var addOpen by remember { mutableStateOf(false) }
-    var resetOpen by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
+    var addOpen by rememberSaveable { mutableStateOf(false) }
+    var resetOpen by rememberSaveable { mutableStateOf(false) }
     fun update(list: List<Entry>) { entries.clear(); entries.addAll(list); store.save(entries.toList()) }
     val count = entries.count { it.packed }
     val fraction = if (entries.isEmpty()) 0f else count.toFloat() / entries.size
@@ -106,7 +111,7 @@ private fun App(store: Store) {
         topBar = { TopAppBar(title = { Text("छुट्टियों की पैकिंग सूची") },
             actions = { TextButton(onClick = { resetOpen = true }) { Text("रीसेट") } }) },
         floatingActionButton = { ExtendedFloatingActionButton(
-            onClick = { addOpen = true }, text = { Text("+ सामान जोड़ें") }) }
+            onClick = { addOpen = true }) { Text("+ सामान जोड़ें") } }
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets)) {
             Card(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -190,9 +195,9 @@ private fun App(store: Store) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddDialog(onDismiss: () -> Unit, onAdd: (String, String, Category) -> Unit) {
-    var hi by remember { mutableStateOf("") }
-    var en by remember { mutableStateOf("") }
-    var cat by remember { mutableStateOf(Category.OTHER) }
+    var hi by rememberSaveable { mutableStateOf("") }
+    var en by rememberSaveable { mutableStateOf("") }
+    var cat by rememberSaveable { mutableStateOf(Category.OTHER) }
     var expanded by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("नया सामान जोड़ें") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -205,7 +210,7 @@ private fun AddDialog(onDismiss: () -> Unit, onAdd: (String, String, Category) -
                 OutlinedTextField(value = cat.label, onValueChange = {}, readOnly = true,
                     label = { Text("श्रेणी") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier = Modifier.menuAnchor())
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable))
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     Category.entries.forEach { c ->
                         DropdownMenuItem(text = { Text(c.label) },

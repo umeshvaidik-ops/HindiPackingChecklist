@@ -1,29 +1,82 @@
-name: Build Debug APK
+name: Build and Verify Android App
+
 on:
   push:
     branches: ["**"]
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK 35
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build APK, run persistence tests, and check Android lint
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+      - name: Prepare downloads
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - uses: gradle/actions/setup-gradle@v4
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/HindiPackingChecklist-debug.apk
+          git archive --format=zip --prefix=HindiPackingChecklist/ --output=dist/HindiPackingChecklist_AndroidProject.zip HEAD
+          cd dist
+          sha256sum *.apk *.zip > SHA256SUMS.txt
+      - name: Upload APK and complete Android Studio project
+        uses: actions/upload-artifact@v4
         with:
-          gradle-version: '8.10.2'
-      - run: gradle --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: HindiPackingChecklist-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: HindiPackingChecklist-downloads
+          path: dist/
           if-no-files-found: error
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-verification-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+
+  publish-preview:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: HindiPackingChecklist-downloads
+          path: dist
+      - name: Publish verified installable preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+          PREVIEW_TAG: v1.0.0-preview.${{ github.run_number }}
+        run: |
+          gh release create "$PREVIEW_TAG" dist/* \
+            --target "$COMMIT_SHA" \
+            --title "Hindi Packing Checklist 1.0.0 — verified preview" \
+            --prerelease \
+            --notes "Install HindiPackingChecklist-debug.apk on Android 7.0 or newer. This APK uses a debug signing key and is for personal testing. The complete Android Studio project includes the Gradle wrapper. APK build, persistence tests, and Android lint passed in this workflow. Physical-device UI testing and production release signing are separate steps."
