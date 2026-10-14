@@ -1,6 +1,7 @@
 package com.example.packingchecklisthindi
 
 import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -66,7 +67,11 @@ internal fun PackingApp(store: Store) {
     val localizedContext = remember(activityContext, data.language, deviceConfiguration) {
         val config = Configuration(deviceConfiguration)
         config.setLocale(Locale.forLanguageTag(data.language.tag))
-        activityContext.createConfigurationContext(config)
+        // Keep the Activity in the base-context chain so result launchers and dialogs
+        // can still find their owners after the resource locale is changed.
+        ContextThemeWrapper(activityContext, R.style.Theme_PackingChecklist).apply {
+            applyOverrideConfiguration(config)
+        }
     }
     val dark = when (data.theme) {
         ThemeMode.LIGHT -> false
