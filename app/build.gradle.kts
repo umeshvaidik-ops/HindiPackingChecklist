@@ -24,6 +24,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // Keep all three languages available for offline switching in App Bundles too.
+    bundle { language { enableSplit = false } }
     buildFeatures { compose = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
@@ -42,3 +44,4 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("org.robolectric:robolectric:4.14.1")
 }
+
